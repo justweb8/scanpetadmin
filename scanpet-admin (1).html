@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScanPet Admin — Generador de Códigos NFC</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --ink:#0F1117;--ink2:#2D3142;--muted:#6B7280;--light:#F4F1EC;--white:#FDFCFA;
+  --accent:#E8521A;--green:#1A9E6E;--green-light:#DFFAF0;
+  --amber:#D4820A;--amber-light:#FEF3DC;
+  --red:#C0392B;--red-light:#FEE8E7;
+  --border:rgba(15,17,23,0.1);--border2:rgba(15,17,23,0.18);
+  --r:14px;--r-sm:8px;
+  --shadow:0 2px 20px rgba(15,17,23,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Cabinet Grotesk',sans-serif;background:var(--light);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* TOPBAR */
+header{background:var(--ink);padding:0 2rem;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-family:'Fraunces',serif;font-size:20px;color:#fff;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);}
+.admin-badge{background:rgba(232,82,26,.25);border:1px solid rgba(232,82,26,.4);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;}
+.header-user{display:flex;align-items:center;gap:10px;}
+.user-av{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+.user-nm{font-size:13px;color:rgba(255,255,255,.7);}
+.btn-out{background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:5px 12px;font-family:'Cabinet Grotesk',sans-serif;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;}
+.btn-out:hover{border-color:rgba(255,255,255,.4);color:#fff;}
+
+/* LOGIN */
+.login-wrap{max-width:400px;margin:5rem auto;padding:0 1.5rem;}
+.login-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:2rem;}
+.login-card h2{font-family:'Fraunces',serif;font-size:24px;font-weight:600;margin-bottom:4px;}
+.login-card p{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:6px;}
+.form-group input{width:100%;padding:10px 14px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--white);font-family:'Cabinet Grotesk',sans-serif;font-size:14px;outline:none;transition:border .15s;}
+.form-group input:focus{border-color:var(--accent);}
+.btn-login{width:100%;padding:12px;border-radius:var(--r-sm);border:none;background:var(--ink);color:#fff;font-family:'Cabinet Grotesk',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-login:hover{background:#2D3142;}
+.login-note{margin-top:1rem;font-size:12px;color:var(--muted);text-align:center;line-height:1.5;}
+
+/* MAIN LAYOUT */
+.main{max-width:1050px;margin:0 auto;padding:2rem 1.5rem 4rem;display:none;}
+.main.visible{display:block;}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:2rem;}
+.stat-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:1.25rem;}
+.stat-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.stat-val{font-size:30px;font-weight:700;color:var(--ink);font-family:'Fraunces',serif;line-height:1;}
+.stat-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+.stat-card.green .stat-val{color:var(--green);}
+.stat-card.amber .stat-val{color:var(--amber);}
+.stat-card.red .stat-val{color:var(--red);}
+
+/* GENERATOR CARD */
+.gen-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:1.5rem;margin-bottom:1.5rem;}
+.card-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.card-sub{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+.gen-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+.ctrl-group{display:flex;flex-direction:column;gap:6px;}
+.ctrl-group label{font-size:12px;font-weight:600;color:var(--ink2);}
+.ctrl-group input,.ctrl-group select{padding:10px 14px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--white);font-family:'Cabinet Grotesk',sans-serif;font-size:14px;color:var(--ink);outline:none;transition:border .15s;min-width:140px;}
+.ctrl-group input:focus,.ctrl-group select:focus{border-color:var(--accent);}
+.btn-gen{padding:10px 24px;border-radius:var(--r-sm);border:none;background:var(--accent);color:#fff;font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px;white-space:nowrap;}
+.btn-gen:hover{background:#C43E10;}
+.btn-gen:disabled{opacity:.6;cursor:not-allowed;}
+
+/* PREVIEW */
+.preview-box{background:var(--light);border-radius:var(--r-sm);border:1px dashed var(--border2);padding:1.25rem;margin-top:1.25rem;display:none;}
+.preview-box.visible{display:block;}
+.preview-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.code-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;max-height:220px;overflow-y:auto;margin-bottom:12px;}
+.code-chip{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:monospace;font-size:13px;font-weight:600;color:var(--ink2);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.code-status{width:8px;height:8px;border-radius:50%;background:#D1D5DB;flex-shrink:0;}
+.code-status.active{background:var(--green);}
+.preview-actions{display:flex;gap:10px;flex-wrap:wrap;}
+.btn-action{padding:9px 20px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:transparent;font-family:'Cabinet Grotesk',sans-serif;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink2);transition:all .15s;display:flex;align-items:center;gap:6px;}
+.btn-action:hover{border-color:var(--ink);color:var(--ink);}
+.btn-action.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+.btn-action.primary:hover{background:#2D3142;}
+.btn-action.green{background:var(--green);color:#fff;border-color:var(--green);}
+.btn-action.green:hover{background:#157A55;}
+.btn-action:disabled{opacity:.5;cursor:not-allowed;}
+
+/* TABLE */
+.table-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;margin-bottom:1.5rem;}
+.table-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.table-header h3{font-size:15px;font-weight:700;}
+.filter-row{display:flex;gap:8px;align-items:center;}
+.filter-select{padding:7px 12px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--white);font-family:'Cabinet Grotesk',sans-serif;font-size:13px;color:var(--ink);outline:none;cursor:pointer;}
+.search-input{padding:7px 12px;border-radius:var(--r-sm);border:1px solid var(--border2);background:var(--white);font-family:'Cabinet Grotesk',sans-serif;font-size:13px;color:var(--ink);outline:none;width:200px;}
+.search-input:focus{border-color:var(--accent);}
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--light);}
+td{padding:12px 16px;font-size:13px;color:var(--ink2);border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#FAFAF8;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge.available{background:var(--green-light);color:var(--green);}
+.badge.used{background:#F3F4F6;color:var(--muted);}
+.badge.new{background:var(--amber-light);color:var(--amber);}
+.code-mono{font-family:monospace;font-size:13px;font-weight:600;color:var(--ink);letter-spacing:.02em;}
+.btn-copy{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px 6px;border-radius:4px;transition:all .15s;}
+.btn-copy:hover{background:var(--light);color:var(--ink);}
+.btn-del{background:none;border:none;cursor:pointer;color:#D1D5DB;font-size:13px;padding:2px 8px;border-radius:4px;transition:all .15s;font-family:'Cabinet Grotesk',sans-serif;font-weight:600;}
+.btn-del:hover{background:var(--red-light);color:var(--red);}
+.empty-row td{text-align:center;padding:2.5rem;color:var(--muted);}
+
+/* LOADING SPIN */
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.spin.dark{border-color:var(--border);border-top-color:var(--ink);}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;font-family:'Cabinet Grotesk',sans-serif;font-size:13px;cursor:pointer;color:var(--ink2);transition:all .15s;}
+.page-btn:hover{border-color:var(--ink);}
+.page-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.page-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:11px 22px;border-radius:40px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:9999;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* NFC INFO BOX */
+.nfc-howto{background:var(--amber-light);border:1px solid #F5D07A;border-radius:var(--r);padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;gap:14px;}
+.nfc-howto-icon{font-size:28px;flex-shrink:0;}
+.nfc-howto h4{font-size:14px;font-weight:700;color:var(--amber);margin-bottom:6px;}
+.nfc-howto ol{font-size:13px;color:#7A5C0A;line-height:1.8;padding-left:1.2rem;}
+
+@media(max-width:600px){
+  .gen-controls{flex-direction:column;}
+  .ctrl-group input,.ctrl-group select{min-width:100%;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  th:nth-child(3),td:nth-child(3),th:nth-child(5),td:nth-child(5){display:none;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="logo"><span class="logo-dot"></span>ScanPet</div>
+    <span class="admin-badge">ADMIN</span>
+  </div>
+  <div class="header-user" id="hdr-user" style="display:none">
+    <div class="user-av" id="hdr-av">A</div>
+    <span class="user-nm" id="hdr-nm">Admin</span>
+    <button class="btn-out" onclick="doSignOut()">Salir</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="login-section">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>Panel de administrador</h2>
+      <p>Bienvenido, David 👋</p>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="adm-email" value="perezolivosdavid@gmail.com" readonly style="background:#F9F9F9;color:#6B7280;cursor:not-allowed;" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="adm-pass" placeholder="Contraseña" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn-login" id="btn-login" onclick="doLogin()">
+        Entrar al panel →
+      </button>
+      <p class="login-note">Este panel es solo para ti.<br>Los clientes nunca ven esta pantalla.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN PANEL -->
+<div class="main" id="main-panel">
+
+  <!-- STATS -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card green">
+      <div class="stat-label">Disponibles</div>
+      <div class="stat-val" id="stat-avail">—</div>
+      <div class="stat-sub">Listas para vender</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-label">Activadas</div>
+      <div class="stat-val" id="stat-used">—</div>
+      <div class="stat-sub">Vendidas y en uso</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total generadas</div>
+      <div class="stat-val" id="stat-total">—</div>
+      <div class="stat-sub">Todos los códigos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Mascotas registradas</div>
+      <div class="stat-val" id="stat-pets">—</div>
+      <div class="stat-sub">Perfiles activos</div>
+    </div>
+  </div>
+
+  <!-- NFC HOWTO -->
+  <div class="nfc-howto">
+    <div class="nfc-howto-icon">📡</div>
+    <div>
+      <h4>¿Cómo programar las placas NFC?</h4>
+      <ol>
+        <li>Genera los códigos aquí y guárdalos en Supabase</li>
+        <li>Descarga la app <strong>NFC Tools</strong> en tu celular (gratis)</li>
+        <li>Acerca el chip NFC al teléfono → "Escribir" → "URL"</li>
+        <li>Escribe: <strong>https://tusitio.com/p/SCNPT-XXXXXX</strong></li>
+        <li>Imprime el código en la cajita y entrégaselo al cliente</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- GENERATOR -->
+  <div class="gen-card">
+    <div class="card-title">⚡ Generador de códigos NFC</div>
+    <div class="card-sub">Genera los códigos únicos que irán programados en cada placa física</div>
+    <div class="gen-controls">
+      <div class="ctrl-group">
+        <label>Cantidad a generar</label>
+        <input type="number" id="gen-qty" value="10" min="1" max="500" placeholder="10">
+      </div>
+      <div class="ctrl-group">
+        <label>Prefijo del código</label>
+        <input type="text" id="gen-prefix" value="SCNPT" maxlength="8" placeholder="SCNPT" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="ctrl-group">
+        <label>Longitud del sufijo</label>
+        <select id="gen-len">
+          <option value="6" selected>6 caracteres (ej. A1B2C3)</option>
+          <option value="8">8 caracteres (ej. A1B2C3D4)</option>
+          <option value="4">4 caracteres (ej. A1B2)</option>
+        </select>
+      </div>
+      <button class="btn-gen" id="btn-gen" onclick="generateCodes()">
+        ⚡ Generar códigos
+      </button>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="preview-box" id="preview-box">
+      <div class="preview-title">
+        <span id="preview-label">Vista previa — 0 códigos</span>
+        <span id="preview-count" style="font-size:12px;color:var(--green);font-weight:700;"></span>
+      </div>
+      <div class="code-grid" id="code-grid"></div>
+      <div class="preview-actions">
+        <button class="btn-action green" id="btn-save-db" onclick="saveToSupabase()">
+          💾 Guardar en Supabase
+        </button>
+        <button class="btn-action" onclick="exportCSV()">
+          📄 Exportar CSV
+        </button>
+        <button class="btn-action" onclick="exportTXT()">
+          📋 Exportar TXT
+        </button>
+        <button class="btn-action" style="color:var(--red);border-color:#FCA5A5" onclick="clearPreview()">
+          🗑 Descartar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-card">
+    <div class="table-header">
+      <h3>Todos los códigos NFC</h3>
+      <div class="filter-row">
+        <input class="search-input" id="search-input" placeholder="Buscar código..." oninput="filterTable()">
+        <select class="filter-select" id="filter-status" onchange="filterTable()">
+          <option value="all">Todos</option>
+          <option value="false">Disponibles</option>
+          <option value="true">Activados</option>
+        </select>
+        <button class="btn-action" style="padding:7px 14px;font-size:12px;" onclick="loadCodes()">↻ Actualizar</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Estado</th>
+            <th>Mascota</th>
+            <th>Creado</th>
+            <th>Activado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="codes-tbody">
+          <tr class="empty-row"><td colspan="6"><span class="spin dark"></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination">
+      <span id="pag-info">Cargando...</span>
+      <div class="page-btns" id="pag-btns"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  SCANPET ADMIN — NFC Code Manager
+// ═══════════════════════════════════════════
+
+const _URL = 'https://qrhlkamnfvslrfqidefo.supabase.co';
+const _KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyaGxrYW1uZnZzbHJmcWlkZWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNDExMzYsImV4cCI6MjA4OTcxNzEzNn0.mLKDtecQz7m5tQC7P4yjma1Tzj9ZGxQVG4TgfjwWnnY';
+
+let sbAdmin = null;
+let generatedCodes = [];
+let allCodes = [];
+let filteredCodes = [];
+let currentPage = 1;
+const PAGE_SIZE = 20;
+
+// ── INIT ──────────────────────────────────
+try {
+  sbAdmin = window.supabase.createClient(_URL, _KEY, {
+    auth: { persistSession: true, autoRefreshToken: true }
+  });
+  sbAdmin.auth.onAuthStateChange((event, session) => {
+    if (session?.user) showPanel(session.user);
+    else showLogin();
+  });
+  sbAdmin.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) showPanel(session.user);
+  });
+} catch(e) { showToast('❌ Error conectando Supabase'); }
+
+// ── AUTH ──────────────────────────────────
+const ADMIN_EMAIL = 'perezolivosdavid@gmail.com';
+
+async function doLogin() {
+  const email = document.getElementById('adm-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('adm-pass').value;
+  if (!email || !pass) { showToast('⚠️ Ingresa email y contraseña'); return; }
+  if (email !== ADMIN_EMAIL) {
+    showToast('❌ Acceso denegado');
+    document.getElementById('adm-pass').value = '';
+    return;
+  }
+  const btn = document.getElementById('btn-login');
+  btn.innerHTML = '<span class="spin"></span> Verificando...';
+  btn.disabled = true;
+  const { data, error } = await sbAdmin.auth.signInWithPassword({ email, password: pass });
+  btn.innerHTML = 'Entrar al panel →';
+  btn.disabled = false;
+  if (error) { showToast('❌ Contraseña incorrecta'); return; }
+  if (data.user) showPanel(data.user);
+}
+
+async function doSignOut() {
+  await sbAdmin.auth.signOut();
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login-section').style.display = 'block';
+  document.getElementById('main-panel').classList.remove('visible');
+  document.getElementById('hdr-user').style.display = 'none';
+}
+
+function showPanel(user) {
+  document.getElementById('login-section').style.display = 'none';
+  document.getElementById('main-panel').classList.add('visible');
+  document.getElementById('hdr-user').style.display = 'flex';
+  const name = user.user_metadata?.full_name || user.email.split('@')[0];
+  document.getElementById('hdr-nm').textContent = name;
+  document.getElementById('hdr-av').textContent = name.charAt(0).toUpperCase();
+  loadStats();
+  loadCodes();
+}
+
+// ── STATS ─────────────────────────────────
+async function loadStats() {
+  const [tagsRes, petsRes] = await Promise.all([
+    sbAdmin.from('nfc_tags').select('is_activated', { count: 'exact' }),
+    sbAdmin.from('pets').select('id', { count: 'exact' }).eq('is_active', true)
+  ]);
+  const tags = tagsRes.data || [];
+  const avail = tags.filter(t => !t.is_activated).length;
+  const used  = tags.filter(t => t.is_activated).length;
+  document.getElementById('stat-avail').textContent = avail;
+  document.getElementById('stat-used').textContent  = used;
+  document.getElementById('stat-total').textContent = tags.length;
+  document.getElementById('stat-pets').textContent  = petsRes.count || 0;
+}
+
+// ── GENERATE CODES ────────────────────────
+function makeCode(prefix, length) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < length; i++) {
+    suffix += chars[Math.floor(Math.random() * chars.length)];
+    if (i === Math.floor(length / 2) - 1) suffix += '-';
+  }
+  return prefix + '-' + suffix;
+}
+
+function generateCodes() {
+  const qty    = Math.min(500, Math.max(1, parseInt(document.getElementById('gen-qty').value) || 10));
+  const prefix = (document.getElementById('gen-prefix').value.trim() || 'SCNPT').toUpperCase();
+  const len    = parseInt(document.getElementById('gen-len').value);
+
+  // Generate unique codes (no duplicates with existing)
+  const existing = new Set(allCodes.map(c => c.code));
+  const newCodes = new Set();
+  let attempts = 0;
+  while (newCodes.size < qty && attempts < qty * 10) {
+    const c = makeCode(prefix, len);
+    if (!existing.has(c) && !newCodes.has(c)) newCodes.add(c);
+    attempts++;
+  }
+
+  generatedCodes = Array.from(newCodes);
+  renderPreview();
+}
+
+function renderPreview() {
+  const box   = document.getElementById('preview-box');
+  const grid  = document.getElementById('code-grid');
+  const label = document.getElementById('preview-label');
+  const count = document.getElementById('preview-count');
+
+  box.classList.add('visible');
+  label.textContent = `Vista previa — ${generatedCodes.length} códigos nuevos`;
+  count.textContent = `✓ Sin duplicados`;
+
+  grid.innerHTML = generatedCodes.map(c => `
+    <div class="code-chip">
+      <span>${c}</span>
+      <span class="code-status new" title="Nuevo"></span>
+    </div>`).join('');
+}
+
+function clearPreview() {
+  generatedCodes = [];
+  document.getElementById('preview-box').classList.remove('visible');
+}
+
+// ── SAVE TO SUPABASE ──────────────────────
+async function saveToSupabase() {
+  if (!generatedCodes.length) { showToast('⚠️ Genera códigos primero'); return; }
+  const btn = document.getElementById('btn-save-db');
+  btn.innerHTML = '<span class="spin"></span> Guardando...';
+  btn.disabled = true;
+
+  const rows = generatedCodes.map(code => ({ code, is_activated: false }));
+
+  // Insert in batches of 100
+  let saved = 0;
+  let errors = 0;
+  for (let i = 0; i < rows.length; i += 100) {
+    const batch = rows.slice(i, i + 100);
+    const { error } = await sbAdmin.from('nfc_tags').insert(batch);
+    if (error) { errors += batch.length; }
+    else { saved += batch.length; }
+  }
+
+  btn.innerHTML = '💾 Guardar en Supabase';
+  btn.disabled = false;
+
+  if (errors > 0) {
+    showToast(`⚠️ ${saved} guardados, ${errors} con error (posibles duplicados)`);
+  } else {
+    showToast(`✅ ${saved} códigos guardados en Supabase`);
+  }
+
+  clearPreview();
+  loadStats();
+  loadCodes();
+}
+
+// ── EXPORT ────────────────────────────────
+function exportCSV() {
+  if (!generatedCodes.length) { showToast('⚠️ Genera códigos primero'); return; }
+  const header = 'Codigo,Estado,URL_NFC\n';
+  const rows = generatedCodes.map(c =>
+    `${c},Disponible,https://tusitio.com/p/${c}`
+  ).join('\n');
+  downloadFile('scanpet-codigos.csv', header + rows, 'text/csv');
+  showToast('✅ CSV descargado');
+}
+
+function exportTXT() {
+  if (!generatedCodes.length) { showToast('⚠️ Genera códigos primero'); return; }
+  const content = generatedCodes.join('\n');
+  downloadFile('scanpet-codigos.txt', content, 'text/plain');
+  showToast('✅ TXT descargado');
+}
+
+function downloadFile(name, content, type) {
+  const blob = new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── LOAD CODES TABLE ──────────────────────
+async function loadCodes() {
+  document.getElementById('codes-tbody').innerHTML =
+    '<tr class="empty-row"><td colspan="6"><span class="spin dark"></span></td></tr>';
+
+  const { data, error } = await sbAdmin
+    .from('nfc_tags')
+    .select(`
+      id, code, is_activated, created_at, activated_at,
+      pets ( name, type )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) { showToast('❌ Error cargando códigos'); return; }
+  allCodes = data || [];
+  filterTable();
+}
+
+function filterTable() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+  filteredCodes = allCodes.filter(c => {
+    const matchSearch = !search || c.code.toLowerCase().includes(search);
+    const matchStatus = status === 'all' || String(c.is_activated) === status;
+    return matchSearch && matchStatus;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('codes-tbody');
+  const total = filteredCodes.length;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filteredCodes.slice(start, start + PAGE_SIZE);
+
+  if (!page.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No hay códigos con esos filtros</td></tr>';
+    document.getElementById('pag-info').textContent = '0 resultados';
+    document.getElementById('pag-btns').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = page.map(c => {
+    const pet  = c.pets?.[0] || c.pets || null;
+    const petName = pet?.name || '—';
+    const date = c.created_at ? new Date(c.created_at).toLocaleDateString('es-PE') : '—';
+    const actDate = c.activated_at ? new Date(c.activated_at).toLocaleDateString('es-PE') : '—';
+    const badge = c.is_activated
+      ? '<span class="badge used">● Activado</span>'
+      : '<span class="badge available">● Disponible</span>';
+    return `
+      <tr>
+        <td>
+          <span class="code-mono">${c.code}</span>
+          <button class="btn-copy" onclick="copyCode('${c.code}')" title="Copiar">⧉</button>
+        </td>
+        <td>${badge}</td>
+        <td>${petName}</td>
+        <td>${date}</td>
+        <td>${actDate}</td>
+        <td>
+          ${!c.is_activated ? `<button class="btn-del" onclick="deleteCode('${c.id}','${c.code}')">Eliminar</button>` : '—'}
+        </td>
+      </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById('pag-info').textContent =
+    `Mostrando ${start + 1}–${Math.min(start + PAGE_SIZE, total)} de ${total} códigos`;
+
+  const btns = document.getElementById('pag-btns');
+  btns.innerHTML = '';
+  const prev = document.createElement('button');
+  prev.className = 'page-btn'; prev.textContent = '← Ant';
+  prev.disabled = currentPage === 1;
+  prev.onclick = () => { currentPage--; renderTable(); };
+  btns.appendChild(prev);
+
+  // Page numbers (show ±2 from current)
+  for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
+    const pb = document.createElement('button');
+    pb.className = 'page-btn' + (p === currentPage ? ' active' : '');
+    pb.textContent = p;
+    pb.onclick = () => { currentPage = p; renderTable(); };
+    btns.appendChild(pb);
+  }
+
+  const next = document.createElement('button');
+  next.className = 'page-btn'; next.textContent = 'Sig →';
+  next.disabled = currentPage === totalPages;
+  next.onclick = () => { currentPage++; renderTable(); };
+  btns.appendChild(next);
+}
+
+// ── ACTIONS ───────────────────────────────
+async function deleteCode(id, code) {
+  if (!confirm(`¿Eliminar el código ${code}?\nSolo se pueden eliminar códigos no activados.`)) return;
+  const { error } = await sbAdmin.from('nfc_tags').delete().eq('id', id).eq('is_activated', false);
+  if (error) { showToast('❌ No se pudo eliminar'); return; }
+  showToast(`🗑 Código ${code} eliminado`);
+  loadStats();
+  loadCodes();
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => showToast(`✅ Copiado: ${code}`));
+}
+
+// ── TOAST ─────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
